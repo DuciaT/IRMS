@@ -10,8 +10,8 @@ import {
   IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OrderType } from '../order.service';
 import { OrderStatus } from '../order.entity';
+import { OrderType } from '../order-type.enum';
 
 export class CreateOrderItemDto {
   @IsOptional()

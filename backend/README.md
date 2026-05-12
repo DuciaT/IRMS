@@ -25,6 +25,38 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Run MySQL with Docker (for this project)
+
+1. Create local env file:
+
+```bash
+cp .env.example .env
+```
+
+2. Start MySQL container:
+
+```bash
+docker compose up -d
+```
+
+3. Check container health:
+
+```bash
+docker compose ps
+```
+
+4. Run backend with pnpm:
+
+```bash
+pnpm install
+pnpm run start:dev
+```
+
+Notes:
+- `docker-compose.yml` creates DB `restaurant_db` automatically.
+- Credentials in compose file match `.env.example`.
+- Stop MySQL with `docker compose down` (add `-v` if you want to delete data volume).
+
 ## Project setup
 
 ```bash

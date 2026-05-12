@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { OrderItem } from './order-item.entity';
 import { Payment } from '../payment/payment.entity';
-import { OrderType } from './order.service';
+import { OrderType } from './order-type.enum';
 
 export enum OrderStatus {
   PENDING = 'PENDING',

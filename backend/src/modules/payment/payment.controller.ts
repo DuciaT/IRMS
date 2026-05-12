@@ -1,76 +1,64 @@
-import { 
-  Controller, 
-  Post, 
-  Get, 
-  Put, 
-  Body, 
-  Param, 
-  Query, 
-  HttpCode, 
-  HttpStatus, 
-  UseGuards, 
-  Req, 
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
   Res,
-  ForbiddenException, 
-  Logger 
+  UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { PaymentService } from './payment.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { UserRole } from '../user/user-role.enum';
 import {
   CreatePaymentDto,
   ProcessPaymentDto,
   RefundPaymentDto,
 } from './dto/create-payment.dto';
 import { Payment, PaymentStatus } from './payment.entity';
-import { AuthGuard } from '../auth/auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-/**
- * 💳 PaymentController - CSR quầy quản lý Bill/Thanh toán
- * ✅ FIX #1 & #2: Thêm AuthGuard + RolesGuard + Fix logic tạo bill
- * - Chỉ CSR hoặc ADMIN mới được tạo/xử lý bill
- * - CSR chỉ được xử lý bill của mình
- * - Refund chỉ ADMIN
- */
+import { PaymentService } from './payment.service';
+
+const BILL_ACCESS_ROLES = [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.CASHIER,
+  UserRole.SERVER,
+];
+
 @Controller('api/bills')
 @UseGuards(AuthGuard, RolesGuard)
 export class PaymentController {
-  private logger = new Logger('PaymentController');
-
   constructor(private readonly paymentService: PaymentService) {}
 
   @Post()
-  @Roles('CSR', 'ADMIN')
+  @Roles(...BILL_ACCESS_ROLES)
   @HttpCode(HttpStatus.CREATED)
   async createPayment(
     @Body() createPaymentDto: CreatePaymentDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<Payment> {
-    const csrId = req.user.id;
-    const csrName = req.user.name;
-
-    this.logger.log(
-      `📄 CSR ${csrName} creating bill for order ${createPaymentDto.orderId}...`,
-    );
-
-    // ✅ FIX #1: Tự động lấy CSR info từ JWT token
     return this.paymentService.createPayment({
       ...createPaymentDto,
-      csrId,
-      csrName,
+      csrId: user.id,
+      csrName: user.fullName,
     });
   }
 
   @Get()
-  @Roles('CSR', 'ADMIN') 
+  @Roles(...BILL_ACCESS_ROLES)
   async getAll(
-    @Req() req: any,     
-    @Query('skip') skip?: string,     
+    @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('status') status?: PaymentStatus,
   ): Promise<{ data: Payment[]; total: number }> {
-    this.logger.log(`Fetching bills for ${req.user.name} (role: ${req.user.role})`);
-    
     return this.paymentService.getAllPayments(
       skip ? Number(skip) : 0,
       take ? Number(take) : 20,
@@ -79,47 +67,26 @@ export class PaymentController {
   }
 
   @Get(':id')
-  @Roles('CSR', 'ADMIN')
-  async getPaymentById(
-    @Param('id') id: string,
-    @Req() req: any,
-  ): Promise<Payment> {
-    this.logger.log(`👁️ CSR ${req.user.name} viewing bill ${id}`);
+  @Roles(...BILL_ACCESS_ROLES)
+  async getPaymentById(@Param('id') id: string): Promise<Payment> {
     return this.paymentService.getPaymentById(id);
   }
 
   @Get('order/:orderId')
-  @Roles('CSR', 'ADMIN')
-  async getPaymentByOrderId(
-    @Param('orderId') orderId: string,
-    @Req() req: any,
-  ): Promise<Payment> {
-    this.logger.log(`👁️ CSR ${req.user.name} viewing bill for order ${orderId}`);
+  @Roles(...BILL_ACCESS_ROLES)
+  async getPaymentByOrderId(@Param('orderId') orderId: string): Promise<Payment> {
     return this.paymentService.getPaymentByOrderId(orderId);
   }
 
   @Post(':id/payment')
-  @Roles('CSR', 'ADMIN')
+  @Roles(...BILL_ACCESS_ROLES)
   @HttpCode(HttpStatus.OK)
   async processPayment(
     @Param('id') id: string,
     @Body() processPaymentDto: ProcessPaymentDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<Payment> {
-    const payment = await this.paymentService.getPaymentById(id);
-
-    // ✅ FIX #1: CSR chỉ xử lý thanh toán của chính mình
-    if (payment.csrId !== req.user.id && req.user.role !== 'ADMIN') {
-      this.logger.warn(
-        `❌ CSR ${req.user.name} tried to process bill ${id} created by ${payment.csrName}`,
-      );
-      throw new ForbiddenException('Cannot process other CSR payments');
-    }
-
-    this.logger.log(
-      `💰 CSR ${req.user.name} processing payment: ${processPaymentDto.amount}đ for bill ${id}`,
-    );
-
+    await this.assertCanMutatePayment(id, user);
     return this.paymentService.processPayment({
       ...processPaymentDto,
       paymentId: id,
@@ -127,17 +94,12 @@ export class PaymentController {
   }
 
   @Post(':id/refund')
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async refundPayment(
     @Param('id') id: string,
     @Body() refundPaymentDto: RefundPaymentDto,
-    @Req() req: any,
   ): Promise<Payment> {
-    this.logger.log(
-      `🔄 ADMIN ${req.user.name} refunding bill ${id}. Amount: ${refundPaymentDto.refundAmount}đ`,
-    );
-
     return this.paymentService.refundPayment({
       ...refundPaymentDto,
       paymentId: id,
@@ -145,26 +107,37 @@ export class PaymentController {
   }
 
   @Get(':id/html')
-  @Roles('CSR', 'ADMIN')
-  async getBillHtml(
-    @Param('id') id: string,
-    @Req() req: any,
-  ): Promise<string> {
-    this.logger.log(`📰 CSR ${req.user.name} exporting bill ${id} as HTML`);
+  @Roles(...BILL_ACCESS_ROLES)
+  async getBillHtml(@Param('id') id: string): Promise<string> {
     return this.paymentService.generateBill(id);
   }
 
   @Get(':id/print')
-  @Roles('CSR', 'ADMIN')
+  @Roles(...BILL_ACCESS_ROLES)
   async printBill(
     @Param('id') id: string,
     @Res() res: Response,
-    @Req() req: any,
   ): Promise<void> {
-    this.logger.log(`🖨️ CSR ${req.user.name} printing bill ${id}`);
-
     const billHTML = await this.paymentService.generateBill(id);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(billHTML);
+  }
+
+  private async assertCanMutatePayment(
+    paymentId: string,
+    user: AuthenticatedUser,
+  ): Promise<void> {
+    const canManageAllPayments =
+      user.role === UserRole.ADMIN || user.role === UserRole.MANAGER;
+
+    if (canManageAllPayments) {
+      return;
+    }
+
+    const payment = await this.paymentService.getPaymentById(paymentId);
+
+    if (payment.csrId !== user.id) {
+      throw new ForbiddenException('You can only process your own bills.');
+    }
   }
 }

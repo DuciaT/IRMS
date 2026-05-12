@@ -1,15 +1,20 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
-import { OrderModule } from './modules/order/order.module';
-import { PaymentModule } from './modules/payment/payment.module';
 import { MenuModule } from './modules/menu/menu.module';
-import { Order } from './modules/order/order.entity';
 import { OrderItem } from './modules/order/order-item.entity';
+import { Order } from './modules/order/order.entity';
+import { OrderModule } from './modules/order/order.module';
 import { Payment } from './modules/payment/payment.entity';
+import { PaymentModule } from './modules/payment/payment.module';
+import { UserModule } from './modules/user/user.module';
 
 @Module({
+  controllers: [AppController],
+  providers: [AppService],
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
@@ -25,12 +30,13 @@ import { Payment } from './modules/payment/payment.entity';
         password: configService.get('DB_PASSWORD', ''),
         database: configService.get('DB_NAME', 'restaurant_db'),
         entities: [Order, OrderItem, Payment],
-        synchronize: configService.get('NODE_ENV', 'development') === 'development',
+        synchronize:
+          configService.get('NODE_ENV', 'development') === 'development',
         logging: configService.get('NODE_ENV', 'development') === 'development',
       }),
     }),
-    // ✅ FIX #1: Thêm AuthModule để export AuthGuard, RolesGuard
     AuthModule,
+    UserModule,
     MenuModule,
     OrderModule,
     PaymentModule,

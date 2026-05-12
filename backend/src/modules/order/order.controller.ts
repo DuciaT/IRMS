@@ -1,75 +1,60 @@
-import { 
-  Controller, 
-  Post, 
-  Get, 
-  Put, 
-  Body, 
-  Param, 
-  Query, 
-  HttpCode, 
-  HttpStatus, 
-  UseGuards, 
-  Req, 
-  ForbiddenException, 
-  Logger 
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { UserRole } from '../user/user-role.enum';
 import { OrderService } from './order.service';
 import {
+  CancelOrderDto,
   CreateOrderDto,
   UpdateOrderDto,
-  ConfirmOrderDto,
-  CancelOrderDto,
   UpdateOrderStatusDto,
 } from './dto/create-order.dto';
 import { Order, OrderStatus } from './order.entity';
-import { AuthGuard } from '../auth/auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
 
-/**
- * 🏪 OrderController - CSR quầy quản lý Order
- * ✅ FIX #1: Thêm AuthGuard + RolesGuard
- * - Chỉ CSR hoặc ADMIN mới được tạo/sửa order
- * - CSR chỉ được sửa order của mình
- */
+const ORDER_ACCESS_ROLES = [UserRole.ADMIN, UserRole.MANAGER, UserRole.SERVER];
+const ORDER_KITCHEN_ROLES = [UserRole.ADMIN, UserRole.MANAGER, UserRole.CHEF];
+
 @Controller('api/orders')
 @UseGuards(AuthGuard, RolesGuard)
 export class OrderController {
-  private logger = new Logger('OrderController');
-
   constructor(private readonly orderService: OrderService) {}
 
   @Post()
-  @Roles('CSR', 'ADMIN')
+  @Roles(...ORDER_ACCESS_ROLES)
   @HttpCode(HttpStatus.CREATED)
   async createOrder(
     @Body() createOrderDto: CreateOrderDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<Order> {
-    const csrId = req.user.id;
-    const csrName = req.user.name;
-
-    this.logger.log(`📝 CSR ${csrName} creating order...`);
-
-    // ✅ FIX #1: Tự động lấy CSR info từ JWT token
     return this.orderService.createOrder({
       ...createOrderDto,
-      csrId,
-      csrName,
+      csrId: user.id,
+      csrName: user.fullName,
     });
   }
 
   @Get()
-  @Roles('CSR', 'ADMIN')
+  @Roles(...ORDER_ACCESS_ROLES)
   async getAllOrders(
-    @Req() req: any,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('status') status?: OrderStatus,
   ): Promise<{ data: Order[]; total: number }> {
-    this.logger.log(`📋 Fetching orders for ${req.user.name} (role: ${req.user.role})`);
-
     return this.orderService.getAllOrders(
       skip ? Number(skip) : 0,
       take ? Number(take) : 20,
@@ -78,131 +63,102 @@ export class OrderController {
   }
 
   @Get('unpaid')
-  @Roles('CSR', 'ADMIN')
-  async getUnpaidOrders(
-    @Req() req: any,
-  ): Promise<Order[]> {
-    this.logger.log(`🔍 Fetching unpaid orders for ${req.user.name}`);
+  @Roles(...ORDER_ACCESS_ROLES)
+  async getUnpaidOrders(): Promise<Order[]> {
     return this.orderService.getUnpaidOrders();
   }
 
   @Get('table/:tableNumber')
-  @Roles('CSR', 'ADMIN')
+  @Roles(...ORDER_ACCESS_ROLES)
   async getOrdersByTable(
     @Param('tableNumber') tableNumber: string,
-    @Req() req: any,
   ): Promise<Order[]> {
-    this.logger.log(`🪑 Fetching orders for table ${tableNumber} by ${req.user.name}`);
     return this.orderService.getOrdersByTable(tableNumber);
   }
 
   @Get(':id')
-  @Roles('CSR', 'ADMIN')
-  async getOrderById(
-    @Param('id') id: string,
-    @Req() req: any,
-  ): Promise<Order> {
-    this.logger.log(`👁️ CSR ${req.user.name} viewing order ${id}`);
+  @Roles(...ORDER_ACCESS_ROLES)
+  async getOrderById(@Param('id') id: string): Promise<Order> {
     return this.orderService.getOrderById(id);
   }
 
   @Put(':id')
-  @Roles('CSR', 'ADMIN')
+  @Roles(...ORDER_ACCESS_ROLES)
   async updateOrder(
     @Param('id') id: string,
     @Body() updateOrderDto: UpdateOrderDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<Order> {
-    const order = await this.orderService.getOrderById(id);
-
-    // ✅ FIX #1: CSR chỉ sửa được order của mình
-    if (order.csrId !== req.user.id && req.user.role !== 'ADMIN') {
-      this.logger.warn(
-        `❌ CSR ${req.user.name} tried to edit order ${id} created by ${order.csrName}`,
-      );
-      throw new ForbiddenException('Cannot edit other CSR orders');
-    }
-
-    this.logger.log(`✏️ CSR ${req.user.name} updating order ${id}`);
+    await this.assertCanMutateOrder(id, user);
     return this.orderService.updateOrder(id, updateOrderDto);
   }
 
   @Put(':id/status')
-  @Roles('CSR', 'ADMIN')
+  @Roles(...ORDER_ACCESS_ROLES)
   async updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<Order> {
-    this.logger.log(
-      `🔄 CSR ${req.user.name} updating order ${id} status to ${dto.status}`,
-    );
-    return this.orderService.updateOrderStatus(id, dto.status as OrderStatus);
+    await this.assertCanMutateOrder(id, user);
+    return this.orderService.updateOrderStatus(id, dto.status);
   }
 
   @Post(':id/confirm')
-  @Roles('CSR', 'ADMIN')
+  @Roles(...ORDER_ACCESS_ROLES)
   async confirmOrder(
     @Param('id') id: string,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<Order> {
-    const order = await this.orderService.getOrderById(id);
-
-    // ✅ FIX #1: CSR chỉ confirm order của mình
-    if (order.csrId !== req.user.id && req.user.role !== 'ADMIN') {
-      throw new ForbiddenException('Cannot confirm other CSR orders');
-    }
-
-    this.logger.log(`✅ CSR ${req.user.name} confirming order ${id}`);
+    await this.assertCanMutateOrder(id, user);
     return this.orderService.confirmOrder({ orderId: id });
   }
 
   @Post(':id/ready')
-  @Roles('CSR', 'ADMIN', 'KITCHEN')
-  async markOrderReady(
-    @Param('id') id: string,
-    @Req() req: any,
-  ): Promise<Order> {
-    this.logger.log(`🍽️ ${req.user.name} marking order ${id} as ready`);
+  @Roles(...ORDER_KITCHEN_ROLES)
+  async markOrderReady(@Param('id') id: string): Promise<Order> {
     return this.orderService.markOrderReady(id);
   }
 
   @Post(':id/complete')
-  @Roles('CSR', 'ADMIN')
+  @Roles(...ORDER_ACCESS_ROLES)
   async completeOrder(
     @Param('id') id: string,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<Order> {
-    const order = await this.orderService.getOrderById(id);
-
-    if (order.csrId !== req.user.id && req.user.role !== 'ADMIN') {
-      throw new ForbiddenException('Cannot complete other CSR orders');
-    }
-
-    this.logger.log(`🏁 CSR ${req.user.name} completing order ${id}`);
+    await this.assertCanMutateOrder(id, user);
     return this.orderService.completeOrder(id);
   }
 
   @Post(':id/cancel')
-  @Roles('CSR', 'ADMIN')
+  @Roles(...ORDER_ACCESS_ROLES)
   async cancelOrder(
     @Param('id') id: string,
     @Body() cancelOrderDto: CancelOrderDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<Order> {
-    const order = await this.orderService.getOrderById(id);
-
-    // ✅ FIX #1: CSR chỉ cancel order của mình
-    if (order.csrId !== req.user.id && req.user.role !== 'ADMIN') {
-      throw new ForbiddenException('Cannot cancel other CSR orders');
-    }
-
-    this.logger.log(
-      `❌ CSR ${req.user.name} cancelling order ${id}. Reason: ${cancelOrderDto.reason}`,
-    );
+    await this.assertCanMutateOrder(id, user);
     return this.orderService.cancelOrder({
       orderId: id,
       reason: cancelOrderDto.reason,
     });
+  }
+
+  private async assertCanMutateOrder(
+    orderId: string,
+    user: AuthenticatedUser,
+  ): Promise<void> {
+    const canManageAllOrders =
+      user.role === UserRole.ADMIN || user.role === UserRole.MANAGER;
+
+    if (canManageAllOrders) {
+      return;
+    }
+
+    const order = await this.orderService.getOrderById(orderId);
+
+    if (order.csrId !== user.id) {
+      throw new ForbiddenException('You can only modify your own orders.');
+    }
   }
 }

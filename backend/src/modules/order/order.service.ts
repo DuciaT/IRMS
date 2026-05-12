@@ -14,10 +14,7 @@ import {
   CancelOrderDto,
 } from './dto/create-order.dto';
 import { MenuService } from '../menu/menu.service';
-export enum OrderType {
-  DINE_IN = 'dine-in',
-  TAKEAWAY = 'takeaway',
-}
+import { OrderType } from './order-type.enum';
 
 @Injectable()
 export class OrderService {
