@@ -25,7 +25,7 @@ export default function ServerDashboard() {
   const menuItems = [
     { id: "orders", label: "Take Orders", icon: ShoppingBag },
     { id: "kitchen", label: "Kitchen Display", icon: UtensilsCrossed },
-    { id: "history", label: "Order History", icon: Receipt },
+    // { id: "history", label: "Order History", icon: Receipt },
   ];
 
   const renderContent = () => {
@@ -34,8 +34,8 @@ export default function ServerDashboard() {
         return <DigitalOrdering />;
       case "kitchen":
         return <KitchenDisplay />;
-      case "history":
-        return <RecentOrders />;
+      // case "history":
+      //   return <RecentOrders />;
       default:
         return null;
     }

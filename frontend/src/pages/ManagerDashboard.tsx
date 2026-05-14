@@ -2,8 +2,11 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useParams } from "react-router";
 import {
-  ShoppingBag, UtensilsCrossed, Receipt, Book,
-  SquareMenu
+  ShoppingBag,
+  UtensilsCrossed,
+  Receipt,
+  Book,
+  SquareMenu,
 } from "lucide-react";
 import RecentOrders from "../features/ordering/components/RecentOrders";
 import KitchenDisplay from "../features/kds/components/KitchenDisplay";
@@ -12,11 +15,22 @@ import EnhancedBilling from "../features/billing/components/EnhancedBilling";
 import MenuManagement from "../features/ordering/components/MenuManagement";
 import DashboardLayout from "../common/layouts/DashboardLayout";
 
-type PageView = 'dashboard' | 'orders' | 'kitchen' | 'tables' | 'billing' | 'inventory' | 'analytics' | 'menu' | 'list';
+type PageView =
+  | "dashboard"
+  | "orders"
+  | "kitchen"
+  | "tables"
+  | "billing"
+  | "inventory"
+  | "analytics"
+  | "menu"
+  | "list";
 
 export default function ManagerDashboard() {
   const { page } = useParams();
-  const [currentPage, setCurrentPage] = useState<PageView>((page as PageView) || 'orders');
+  const [currentPage, setCurrentPage] = useState<PageView>(
+    (page as PageView) || "orders",
+  );
 
   // Sync currentPage with URL param
   useEffect(() => {
@@ -26,33 +40,33 @@ export default function ManagerDashboard() {
   }, [page]);
 
   const menuItems = [
-    { id: 'orders', label: 'Digital Ordering', icon: ShoppingBag },
-    { id: 'kitchen', label: 'Kitchen Display', icon: UtensilsCrossed },
-    { id: 'billing', label: 'Billing & Payments', icon: Receipt },
-    { id: 'menu', label: 'Menu Management', icon: SquareMenu },
-    { id: 'list', label: 'Orders History', icon: Book }
+    { id: "orders", label: "Digital Ordering", icon: ShoppingBag },
+    { id: "kitchen", label: "Kitchen Display", icon: UtensilsCrossed },
+    { id: "billing", label: "Billing & Payments", icon: Receipt },
+    { id: "menu", label: "Menu Management", icon: SquareMenu },
+    // { id: 'list', label: 'Orders History', icon: Book }
   ];
 
   const renderContent = () => {
     switch (currentPage) {
-      case 'orders':
+      case "orders":
         return <DigitalOrdering />;
-      case 'kitchen':
+      case "kitchen":
         return <KitchenDisplay />;
-      case 'billing':
+      case "billing":
         return <EnhancedBilling />;
-      case 'menu':
+      case "menu":
         return <MenuManagement />;
-      case 'list':
-        return <RecentOrders />;
+      // case 'list':
+      //   return <RecentOrders />;
       default:
         return null;
     }
   };
 
   const getPageTitle = () => {
-    const page = menuItems.find(item => item.id === currentPage);
-    return page?.label || 'Dashboard';
+    const page = menuItems.find((item) => item.id === currentPage);
+    return page?.label || "Dashboard";
   };
 
   return (

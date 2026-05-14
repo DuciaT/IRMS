@@ -32,7 +32,7 @@ const mockUsers: User[] = [
   {
     id: "USR-001",
     name: "John Manager",
-    email: "manager@irms.com",
+    email: "manager@gmail.com",
     phone: "+1 555-0101",
     role: "manager",
     status: "active",
@@ -42,7 +42,7 @@ const mockUsers: User[] = [
   {
     id: "USR-002",
     name: "Sarah Server",
-    email: "server@irms.com",
+    email: "server@gmail.com",
     phone: "+1 555-0102",
     role: "server",
     status: "active",
@@ -52,7 +52,7 @@ const mockUsers: User[] = [
   {
     id: "USR-003",
     name: "Mike Chef",
-    email: "chef@irms.com",
+    email: "chef@gmail.com",
     phone: "+1 555-0103",
     role: "chef",
     status: "active",
@@ -62,7 +62,7 @@ const mockUsers: User[] = [
   {
     id: "USR-004",
     name: "Lisa Cashier",
-    email: "cashier@irms.com",
+    email: "cashier@gmail.com",
     phone: "+1 555-0104",
     role: "cashier",
     status: "active",
@@ -72,7 +72,7 @@ const mockUsers: User[] = [
   {
     id: "USR-005",
     name: "Tom Host",
-    email: "host@irms.com",
+    email: "host@gmail.com",
     phone: "+1 555-0105",
     role: "server",
     status: "active",
@@ -82,7 +82,7 @@ const mockUsers: User[] = [
   {
     id: "USR-006",
     name: "Admin User",
-    email: "admin@irms.com",
+    email: "admin@gmail.com",
     phone: "+1 555-0100",
     role: "admin",
     status: "active",
@@ -668,7 +668,7 @@ export default function UserManagement() {
                     setUserForm({ ...userForm, email: e.target.value })
                   }
                   className="w-full px-4 py-2 bg-muted border border-border rounded-lg focus:border-accent focus:outline-none"
-                  placeholder="john@irms.com"
+                  placeholder="john@gmail.com"
                 />
               </div>
 

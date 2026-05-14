@@ -1,9 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { type User } from "../types/types";
+import { useUserStore } from "../../../store/useUserStore";
 
 export const useUserManagement = (initialUsers: User[]) => {
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const {
+    users,
+    addVirtualUser,
+    updateVirtualUser,
+    setInitialUsers,
+    deleteVirtualUser,
+    toggleUserStatus,
+  } = useUserStore();
+  useEffect(() => {
+    setInitialUsers(initialUsers);
+  }, [initialUsers, setInitialUsers]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -50,7 +61,10 @@ export const useUserManagement = (initialUsers: User[]) => {
       status: "active",
       joinedDate: new Date().toISOString().split("T")[0],
     };
-    setUsers([newUser, ...users]);
+    addVirtualUser(userForm.email, {
+      password: userForm.password,
+      user: newUser,
+    });
     setCurrentPage(1);
     toast.success(`User ${newUser.name} added successfully!`);
     setShowUserModal(false);
@@ -60,9 +74,15 @@ export const useUserManagement = (initialUsers: User[]) => {
   const handleEditUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingUser) {
-      setUsers(
-        users.map((u) => (u.id === editingUser.id ? { ...u, ...userForm } : u)),
-      );
+      updateVirtualUser(editingUser.email, {
+        password: userForm.password || undefined,
+        user: {
+          name: userForm.name,
+          role: userForm.role,
+          phone: userForm.phone,
+          location: userForm.location,
+        },
+      });
       toast.success(`User ${userForm.name} updated successfully!`);
       setShowUserModal(false);
       setEditingUser(null);
@@ -72,35 +92,21 @@ export const useUserManagement = (initialUsers: User[]) => {
 
   const handleDeleteUser = (userId: string) => {
     const userToDelete = users.find((u) => u.id === userId);
-    const updatedUsers = users.filter((u) => u.id !== userId);
-    setUsers(updatedUsers);
+    deleteVirtualUser(userId);
 
-    // Tính toán lại trang hiện tại sau khi xóa
-    const remainingFiltered = updatedUsers.filter(
-      (u) =>
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
-    const newTotalPages =
-      Math.ceil(remainingFiltered.length / itemsPerPage) || 1;
+    const remainingCount = users.length - 1;
+    const newTotalPages = Math.ceil(remainingCount / itemsPerPage) || 1;
     if (currentPage > newTotalPages) setCurrentPage(newTotalPages);
 
     toast.success(`User ${userToDelete?.name} deleted successfully!`);
   };
 
   const handleToggleStatus = (userId: string) => {
-    setUsers(
-      users.map((user) => {
-        if (user.id === userId) {
-          const newStatus = user.status === "active" ? "inactive" : "active";
-          toast.success(
-            `User ${user.name} has been ${newStatus === "active" ? "unlocked" : "locked"}`,
-          );
-          return { ...user, status: newStatus };
-        }
-        return user;
-      }),
-    );
+    const user = users.find((u) => u.id === userId);
+    toggleUserStatus(userId);
+
+    const newStatusLabel = user?.status === "active" ? "locked" : "unlocked";
+    toast.success(`User ${user?.name} has been ${newStatusLabel}`);
   };
 
   const openAddModal = () => {

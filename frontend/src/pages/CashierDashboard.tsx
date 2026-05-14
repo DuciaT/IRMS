@@ -6,11 +6,13 @@ import EnhancedBilling from "../features/billing/components/EnhancedBilling";
 import RecentOrders from "../features/ordering/components/RecentOrders";
 import DashboardLayout from "../common/layouts/DashboardLayout";
 
-type PageView = 'billing' | 'orders';
+type PageView = "billing" | "orders";
 
 export default function CashierDashboard() {
   const { page } = useParams();
-  const [currentPage, setCurrentPage] = useState<PageView>((page as PageView) || 'billing');
+  const [currentPage, setCurrentPage] = useState<PageView>(
+    (page as PageView) || "billing",
+  );
 
   // Sync currentPage with URL param
   useEffect(() => {
@@ -20,24 +22,24 @@ export default function CashierDashboard() {
   }, [page]);
 
   const menuItems = [
-    { id: 'billing', label: 'Billing & Payments', icon: Receipt },
-    { id: 'orders', label: 'View Orders', icon: ShoppingBag },
+    { id: "billing", label: "Billing & Payments", icon: Receipt },
+    // { id: 'orders', label: 'View Orders', icon: ShoppingBag },
   ];
 
   const renderContent = () => {
     switch (currentPage) {
-      case 'billing':
+      case "billing":
         return <EnhancedBilling />;
-      case 'orders':
-        return <RecentOrders />;
+      // case 'orders':
+      //   return <RecentOrders />;
       default:
         return null;
     }
   };
 
   const getPageTitle = () => {
-    const page = menuItems.find(item => item.id === currentPage);
-    return page?.label || 'Billing & Payments';
+    const page = menuItems.find((item) => item.id === currentPage);
+    return page?.label || "Billing & Payments";
   };
 
   return (
