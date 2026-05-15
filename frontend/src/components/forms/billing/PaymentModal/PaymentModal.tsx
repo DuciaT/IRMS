@@ -44,7 +44,7 @@ const PaymentMethodSelector = ({
   const methods = [
     { id: "cash" as const, icon: DollarSign, label: "Cash" },
     { id: "card" as const, icon: CreditCard, label: "Card" },
-    { id: "online" as const, icon: Send, label: "Digital" },
+    { id: "online" as const, icon: Send, label: "E-Wallet" },
   ];
 
   return (
